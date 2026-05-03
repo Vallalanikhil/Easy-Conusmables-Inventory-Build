@@ -1,0 +1,29 @@
+Building,Item Name,Current Qty,Maximum Qty,Minimum Qty thres.
+CMH73,Isopropyl Alcohol,46,75,25
+CMH73,Thermal Paste,7,30,5
+CMH73,Electrical Tape,22,20,5
+CMH73,Dual-LC Cleaner,6,20,5
+CMH73,MPO Cleaner ,1,20,5
+CMH73,Single-LC Cleaner,66,20,10
+CMH73,MTP to LC 2.3m,16,20,10
+CMH73,MTP to LC 25m ,2,10,2
+CMH73,MTP to LC 30m,0,5,2
+CMH73,MTP to LC 55m,2,5,2
+CMH73,LC to LC 2m,46,30,10
+CMH73,LC to LC 3m,0,30,10
+CMH73,LC to LC 6m,0,20,5
+CMH73,LC to LC 15m,4,8,2
+CMH73,LC to LC 20m,14,10,2
+CMH73,LC to LC 30m,8,8,2
+CMH73,MTP to LC 75m,3,6,2
+CMH73,MTP to LC 85m,3,6,2
+CMH73,MTP to LC 100m,0,4,1
+CMH73,Green CAT6 (10m),15,15,5
+CMH73,Green CAT6 (50m),4,6,2
+CMH73,Orange CAT6 (5m),17,20,5
+CMH73,Orange CAT6 (35m),4,6,2
+CMH73,Orange CAT6 (50m),4,6,2
+CMH73,LC to LC 40m,2,6,2
+CMH73,LC to LC 50m,7,10,2
+CMH73,SFP-H10GB-CU.5M-C,13,10,2
+CMH73,SFP-H10GB-CU3M-C,7,10,2

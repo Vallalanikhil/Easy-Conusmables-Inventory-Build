@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EZ Logi Con Count — Dev Log</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a1a0c;
+      color: #e8d9b0;
+      font-family: 'Cinzel', 'Georgia', serif;
+      min-height: 100vh;
+      padding: 40px 20px 80px;
+    }
+
+    /* ── Page Header ── */
+    .page-header {
+      text-align: center;
+      padding: 40px 20px 32px;
+      border-bottom: 2px solid #c9a84c55;
+      margin-bottom: 48px;
+    }
+    .page-header h1 {
+      font-family: 'Cinzel Decorative', 'Cinzel', serif;
+      font-size: clamp(20px, 4vw, 32px);
+      color: #f0d080;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-shadow: 0 0 24px #c9a84c66;
+      margin-bottom: 10px;
+    }
+    .page-header .subtitle {
+      font-size: 12px;
+      color: #a89060;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .page-header .current-tag {
+      display: inline-block;
+      margin-top: 14px;
+      background: #c9a84c;
+      color: #0a1a0c;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      padding: 4px 14px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    /* ── Version Block ── */
+    .version-block {
+      background: #0d1f0f;
+      border: 1px solid #c9a84c44;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    .version-block.current {
+      border-color: #c9a84c;
+      box-shadow: 0 4px 32px rgba(201,168,76,0.2);
+    }
+
+    .version-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 24px;
+      background: #0a1a0c;
+      border-bottom: 1px solid #c9a84c33;
+      flex-wrap: wrap;
+    }
+    .version-number {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f0d080;
+      letter-spacing: 0.1em;
+    }
+    .version-name {
+      font-size: 13px;
+      color: #c9a84c;
+      letter-spacing: 0.08em;
+      font-style: italic;
+      flex: 1;
+    }
+    .version-status {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      padding: 3px 12px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+    .status-current    { background: #c9a84c; color: #0a1a0c; }
+    .status-superseded { background: #2a2a2a; color: #888; border: 1px solid #444; }
+
+    .version-body { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Section ── */
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .section-title.new     { color: #90d090; }
+    .section-title.changed { color: #89b4fa; }
+    .section-title.fixed   { color: #f0a0a0; }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: currentColor;
+      opacity: 0.2;
+    }
+
+    ul.change-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-left: 4px;
+    }
+    ul.change-list li {
+      font-size: 12px;
+      color: #e8d9b0;
+      line-height: 1.6;
+      padding-left: 18px;
+      position: relative;
+      letter-spacing: 0.02em;
+    }
+    ul.change-list li::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: #c9a84c;
+      font-size: 10px;
+      top: 2px;
+    }
+    ul.change-list li strong {
+      color: #f0d080;
+      font-weight: 700;
+    }
+
+    /* ── Known Issues Table ── */
+    .issues-block {
+      background: #0d1f0f;
+      border: 1px solid #c9a84c44;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    .issues-header {
+      padding: 18px 24px;
+      background: #0a1a0c;
+      border-bottom: 1px solid #c9a84c33;
+      font-size: 14px;
+      font-weight: 700;
+      color: #f0d080;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    table.issues-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    table.issues-table th {
+      padding: 10px 16px;
+      text-align: left;
+      color: #c9a84c;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #c9a84c33;
+      background: #0a1a0c;
+    }
+    table.issues-table td {
+      padding: 10px 16px;
+      color: #e8d9b0;
+      border-bottom: 1px solid #0d1f0f;
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    table.issues-table tr:last-child td { border-bottom: none; }
+    table.issues-table tr:hover td { background: #122614; }
+    .badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      padding: 2px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .badge-workaround { background: #3a3a1a; color: #f0d080; border: 1px solid #c9a84c44; }
+    .badge-monitor    { background: #1a2a3a; color: #89b4fa; border: 1px solid #4080b044; }
+    .badge-planned    { background: #1a3a1a; color: #90d090; border: 1px solid #4caf5044; }
+
+    /* ── Footer ── */
+    .page-footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 10px;
+      color: #a89060;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      line-height: 2;
+      border-top: 1px solid #c9a84c22;
+      padding-top: 24px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Page Header ── -->
+  <div class="page-header">
+    <h1>⚙ EZ Logi Con Count</h1>
+    <div class="subtitle">Consumable Inventory Manager — DCO | CMH73 Pilot</div>
+    <div class="subtitle" style="margin-top:6px;">Development Log &amp; Patch Notes</div>
+    <span class="current-tag">Current Release: v1.3.1</span>
+  </div>
+
+  <div class="container">
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- VERSION 1.3.1                          -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="version-block current">
+      <div class="version-header">
+        <span class="version-number">v1.3.1</span>
+        <span class="version-name">"The Full Kit — Revised"</span>
+        <span class="version-status status-current">Current Release</span>
+      </div>
+      <div class="version-body">
+
+        <div>
+          <div class="section-title changed">✦ Changes</div>
+          <ul class="change-list">
+            <li><strong>CSV Data Merged</strong> — Full CMH73 inventory CSV data integrated directly into the v1.3.0 build, promoting it to v1.3.1</li>
+            <li>All v1.3.0 features confirmed stable: QR Code Generator, Print Label Support, SharePoint Fallback System, SP Status Indicator, Manual Sync Button, Improved Setup Wizard, Viewport-Bounded Dragging, and Stable Drag Anchoring</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- VERSION 1.3.0                          -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="version-block">
+      <div class="version-header">
+        <span class="version-number">v1.3.0</span>
+        <span class="version-name">"The Full Kit"</span>
+        <span class="version-status status-superseded">Superseded</span>
+      </div>
+      <div class="version-body">
+
+        <div>
+          <div class="section-title new">✦ New Features</div>
+          <ul class="change-list">
+            <li><strong>QR Code Generator</strong> — Every inventory item now has a QR button (⬛) that generates a scannable code containing building, item name, min, and max quantity</li>
+            <li><strong>Print Label Support</strong> — QR modal includes a 🖨 Print Label button that opens a clean print-ready label in a new window</li>
+            <li><strong>SharePoint Fallback System</strong> — Script attempts SharePoint sync on load; if unavailable, falls back to local cache silently with an offline toast notification</li>
+            <li><strong>SP Status Indicator</strong> — Header now shows 🟢 (SharePoint connected) or 🟡 (offline / local cache) at a glance</li>
+            <li><strong>Manual Sync Button</strong> — 🔄 button in the header forces an immediate sync to SharePoint without waiting for the hourly timer</li>
+            <li><strong>Improved Setup Wizard</strong> — Settings wizard now opens as an overlay on top of the existing panel with a ✕ close button and backdrop dismiss — non-destructive edit mode</li>
+            <li><strong>Viewport-Bounded Dragging</strong> — Panel can no longer be dragged off-screen; constrained to visible viewport at all times</li>
+            <li><strong>Stable Drag Anchoring</strong> — Fixed panel jumping when dragging by switching from bottom/right to top/left positioning on drag start</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title changed">✦ Changes</div>
+          <ul class="change-list">
+            <li>Quantity adjustments now save to local cache immediately on every click, then push to SharePoint</li>
+            <li>Sync timer now saves local cache AND pushes to SharePoint every hour</li>
+            <li>Minimize button now locks panel width before collapsing to prevent layout reflow</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title fixed">✦ Fixes</div>
+          <ul class="change-list">
+            <li>Panel no longer jumps or resizes when minimized or dragged</li>
+            <li>Wizard close button no longer triggers a full app re-launch when dismissed without saving</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- VERSION 1.2.0                          -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="version-block">
+      <div class="version-header">
+        <span class="version-number">v1.2.0</span>
+        <span class="version-name">"Workflow Automation"</span>
+        <span class="version-status status-superseded">Superseded</span>
+      </div>
+      <div class="version-body">
+
+        <div>
+          <div class="section-title new">✦ New Features</div>
+          <ul class="change-list">
+            <li><strong>Slack Workflow Integration</strong> — Replaced Slack Block Kit payload with a clean key-value JSON payload compatible with Slack Workflow Builder webhooks</li>
+            <li><strong>Workflow Variable Support</strong> — Slack message now passes <strong>building</strong>, <strong>item</strong>, <strong>current</strong>, <strong>reorder</strong>, and <strong>max</strong> as discrete variables for use in Slack Workflow message templates</li>
+            <li><strong>Updated Webhook URL</strong> — Pointed to the active Logi Inventory Alert workflow webhook</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title changed">✦ Changes</div>
+          <ul class="change-list">
+            <li>Removed manual Slack Block Kit message formatting in favor of Slack Workflow-driven message composition</li>
+            <li>Logistics channel notification is now fully automated — no manual message construction required</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title fixed">✦ Fixes</div>
+          <ul class="change-list">
+            <li>Resolved Slack payload mismatch that caused silent alert failures with Workflow trigger webhooks</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- VERSION 1.1.0                          -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="version-block">
+      <div class="version-header">
+        <span class="version-number">v1.1.0</span>
+        <span class="version-name">"Going Offline"</span>
+        <span class="version-status status-superseded">Superseded</span>
+      </div>
+      <div class="version-body">
+
+        <div>
+          <div class="section-title new">✦ New Features</div>
+          <ul class="change-list">
+            <li><strong>CSV Seed Data Embedded</strong> — Full CMH73 inventory (28 items) loaded directly from CSV data; no external data source required to run</li>
+            <li><strong>localStorage Persistence</strong> — Quantity changes now save locally via Tampermonkey's GM_setValue and persist between browser sessions</li>
+            <li><strong>Self-Contained Operation</strong> — Script runs entirely without SharePoint or Graph API; removed all token and auth requirements for this build phase</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title changed">✦ Changes</div>
+          <ul class="change-list">
+            <li>Removed SharePoint Graph API dependency entirely for this version</li>
+            <li>Removed hourly sync timer — no remote backend in this version</li>
+            <li>Removed manual sync button — not applicable without remote backend</li>
+            <li>Script now loads instantly on any page with no auth prompts</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title fixed">✦ Fixes</div>
+          <ul class="change-list">
+            <li>Eliminated "token required" prompt that blocked script from running due to Amazon tenant Graph API restrictions</li>
+            <li>Resolved blank inventory panel caused by failed SharePoint fetch on first load</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- VERSION 1.0.0                          -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="version-block">
+      <div class="version-header">
+        <span class="version-number">v1.0.0</span>
+        <span class="version-name">"First Drop"</span>
+        <span class="version-status status-superseded">Superseded</span>
+      </div>
+      <div class="version-body">
+
+        <div>
+          <div class="section-title new">✦ New Features</div>
+          <ul class="change-list">
+            <li><strong>Initial Script Release</strong> — First working build of EZ Logi Con Count</li>
+            <li><strong>Floating Inventory Panel</strong> — Dark green and gold themed draggable panel rendered on any page via Tampermonkey</li>
+            <li><strong>Setup Wizard</strong> — First-run wizard for selecting building (CMH73) and role (DCO or Logistics)</li>
+            <li><strong>Role-Based Controls</strong> — DCO role: minus quantity only | Logistics role: minus and plus quantity</li>
+            <li><strong>Low Stock Highlighting</strong> — Rows at or below minimum threshold turn red automatically</li>
+            <li><strong>Slack Low Stock Alerts</strong> — Fires a Slack notification to the logistics channel when any item hits its minimum threshold</li>
+            <li><strong>Session Deduplication</strong> — Each item only fires one Slack alert per browser session to prevent spam</li>
+            <li><strong>Minimize / Restore</strong> — Panel can be collapsed to header-only view and restored</li>
+            <li><strong>Draggable Panel</strong> — Panel can be repositioned anywhere on screen</li>
+            <li><strong>Cinzel Gothic Font</strong> — Readable gothic-style font applied throughout via Google Fonts</li>
+            <li><strong>Deep Green Theme</strong> — Forest green with gold accents chosen to contrast against Boost's dark blue UI</li>
+            <li><strong>SharePoint Graph API Integration</strong> — Auto-discovers SharePoint Site ID and Drive ID from existing Microsoft browser session</li>
+            <li><strong>Hourly SharePoint Sync</strong> — Pushes quantity changes back to the Excel file every 60 minutes</li>
+            <li><strong>Column Structure Defined</strong> — Building | Item Name | Current Qty | Maximum Qty | Minimum Qty thres.</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- KNOWN ISSUES & UPCOMING               -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="issues-block">
+      <div class="issues-header">🗺 Known Issues &amp; Upcoming Features</div>
+      <table class="issues-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Issue / Feature</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>SharePoint Graph API blocked by Amazon tenant IT policy</td>
+            <td><span class="badge badge-workaround">Workaround Active</span></td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td>Slack Workflow trigger payload format may need tuning per workflow config</td>
+            <td><span class="badge badge-monitor">Monitoring</span></td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td>Multi-building support beyond CMH73</td>
+            <td><span class="badge badge-planned">Planned</span></td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td>Real-time sync between multiple users on the same building</td>
+            <td><span class="badge badge-planned">Planned</span></td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td>Item add / remove from within the panel (Logistics role)</td>
+            <td><span class="badge badge-planned">Planned</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ── Footer ── -->
+  <div class="page-footer">
+    EZ Logi Con Count — Internal DCO Tooling Project<br/>
+    CMH73 Pilot Program<br/>
+    For issues or feature requests, bring them to the next dev session.
+  </div>
+
+</body>
+</html>

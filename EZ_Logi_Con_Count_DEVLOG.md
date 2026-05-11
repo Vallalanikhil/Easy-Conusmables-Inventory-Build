@@ -9,9 +9,30 @@
 ---
 
 ## ═══════════════════════════════════════
+## 📦 VERSION 1.4.0
+### *"On Target"*
+#### Status: CURRENT RELEASE
+## ═══════════════════════════════════════
+
+### ✅ NEW FEATURES
+- **QR Scan Auto-Deduction** — Hand scanner firing a QR label URL silently deducts 1 from the matching item in the background, saves locally, and fires a Slack alert if threshold is breached — no popup, no page reload, works while minimized
+- **Boost-URL QR Encoding** — All QR codes now encode the Boost URL (`https://myday-website.cmh.aws-border.com`) so hand scanners always hit the correct page
+- **Print Sheet URL Updated** — `CMH73_QR_Print_Sheet.html` updated to use the live Boost URL in all labels
+
+### 🔧 CHANGES
+- Script now restricted to Boost only — `@match` locked to `https://myday-website.cmh.aws-border.com/*`, no longer runs on every website
+- Token prompt popup removed — auth failure now silently falls to offline/local cache mode with no interruption to the user
+
+### 🐛 FIXES
+- Eliminated disruptive token prompt dialog that appeared on every script load
+- QR codes previously encoded raw JSON — now encode actionable Boost URLs compatible with hand scanners
+
+---
+
+## ═══════════════════════════════════════
 ## 📦 VERSION 1.3.1
 ### *"The Full Kit — Revised"*
-#### Status: CURRENT RELEASE
+#### Status: SUPERSEDED
 ## ═══════════════════════════════════════
 
 ### 🔧 CHANGES

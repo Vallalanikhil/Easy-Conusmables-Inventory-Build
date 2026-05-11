@@ -235,19 +235,58 @@
     <h1>⚙ EZ Logi Con Count</h1>
     <div class="subtitle">Consumable Inventory Manager — DCO | CMH73 Pilot</div>
     <div class="subtitle" style="margin-top:6px;">Development Log &amp; Patch Notes</div>
-    <span class="current-tag">Current Release: v1.3.1</span>
+    <span class="current-tag">Current Release: v1.4.0</span>
   </div>
 
   <div class="container">
 
     <!-- ══════════════════════════════════════ -->
-    <!-- VERSION 1.3.1                          -->
+    <!-- VERSION 1.4.0                          -->
     <!-- ══════════════════════════════════════ -->
     <div class="version-block current">
       <div class="version-header">
+        <span class="version-number">v1.4.0</span>
+        <span class="version-name">"On Target"</span>
+        <span class="version-status status-current">Current Release</span>
+      </div>
+      <div class="version-body">
+
+        <div>
+          <div class="section-title new">✦ New Features</div>
+          <ul class="change-list">
+            <li><strong>QR Scan Auto-Deduction</strong> — Hand scanner firing a QR label URL silently deducts 1 from the matching item in the background, saves locally, and fires a Slack alert if threshold is breached — no popup, no page reload, works while minimized</li>
+            <li><strong>Boost-URL QR Encoding</strong> — All QR codes now encode the Boost URL so hand scanners always hit the correct page</li>
+            <li><strong>Print Sheet URL Updated</strong> — CMH73 QR Print Sheet updated to use the live Boost URL in all labels</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title changed">✦ Changes</div>
+          <ul class="change-list">
+            <li>Script now restricted to Boost only — locked to <strong>myday-website.cmh.aws-border.com</strong>, no longer runs on every website</li>
+            <li>Token prompt popup removed — auth failure now silently falls to offline/local cache mode with no interruption</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title fixed">✦ Fixes</div>
+          <ul class="change-list">
+            <li>Eliminated disruptive token prompt dialog that appeared on every script load</li>
+            <li>QR codes previously encoded raw JSON — now encode actionable Boost URLs compatible with hand scanners</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- VERSION 1.3.1                          -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="version-block">
+      <div class="version-header">
         <span class="version-number">v1.3.1</span>
         <span class="version-name">"The Full Kit — Revised"</span>
-        <span class="version-status status-current">Current Release</span>
+        <span class="version-status status-superseded">Superseded</span>
       </div>
       <div class="version-body">
 

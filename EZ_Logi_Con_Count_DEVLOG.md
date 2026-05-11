@@ -9,9 +9,38 @@
 ---
 
 ## ═══════════════════════════════════════
+## 📦 VERSION 1.4.3
+### *"Loud and Clear"*
+#### Status: CURRENT RELEASE
+## ═══════════════════════════════════════
+
+### 🐛 FIXES
+- Slack Workflow payload field names corrected — `building`, `item_needed`, `current_qty`, `reorder_qty`, `max_qty` now match Workflow Builder variable names explicitly
+- Daily digest payload updated to use the same consistent field names
+- Resolves Workflow not displaying building name or item needed in channel messages
+
+---
+
+## ═══════════════════════════════════════
+## 📦 VERSION 1.4.2
+### *"Morning Briefing"*
+#### Status: SUPERSEDED
+## ═══════════════════════════════════════
+
+### ✅ NEW FEATURES
+- **Daily Digest Alert** — Once per calendar day, fires a single bundled Slack message listing all items currently at or below their minimum threshold, including item name, current quantity, and suggested reorder amount
+- **Digest Deduplication** — Last sent date stored in localStorage so the digest only fires once per day even if multiple users have the script open simultaneously
+
+### 🔧 CHANGES
+- Daily digest fires on page load alongside the existing per-item threshold check
+- If no items are low, no digest is sent — channel stays clean on good inventory days
+
+---
+
+## ═══════════════════════════════════════
 ## 📦 VERSION 1.4.1
 ### *"Sheet Happens"*
-#### Status: CURRENT RELEASE
+#### Status: SUPERSEDED
 ## ═══════════════════════════════════════
 
 ### ✅ NEW FEATURES

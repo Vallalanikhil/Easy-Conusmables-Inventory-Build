@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CMH73 — QR Label Print Sheet</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #fff;
+      font-family: 'Cinzel', 'Georgia', serif;
+      padding: 20px;
+      color: #111;
+    }
+
+    .page-title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      color: #111;
+    }
+    .page-sub {
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .label {
+      border: 1.5px solid #333;
+      border-radius: 6px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .label-building {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #888;
+    }
+
+    .label-item {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+      color: #111;
+      line-height: 1.3;
+    }
+
+    .label img {
+      width: 100px;
+      height: 100px;
+      display: block;
+    }
+
+    .label-meta {
+      display: flex;
+      gap: 10px;
+      font-size: 8px;
+      color: #555;
+      letter-spacing: 0.05em;
+    }
+    .label-meta span strong {
+      color: #111;
+      font-weight: 700;
+    }
+
+    .label-id {
+      font-size: 7px;
+      color: #aaa;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    @media print {
+      body { padding: 10px; }
+      .no-print { display: none; }
+      .grid { gap: 8px; }
+    }
+
+    /* Print button */
+    .print-bar {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .print-btn {
+      padding: 10px 28px;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Cinzel', serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .print-btn:hover { background: #333; }
+  </style>
+</head>
+<body>
+
+  <div class="page-title">CMH73 — Consumable QR Labels</div>
+  <div class="page-sub">EZ Logi Con Count | Scan to deduct inventory</div>
+
+  <div class="print-bar no-print">
+    <button class="print-btn" onclick="window.print()">🖨 Print All Labels</button>
+  </div>
+
+  <div class="grid" id="label-grid"></div>
+
+  <script>
+    // ── Inventory list (matches SEED_DATA in script) ──────────────────────
+    const ITEMS = [
+      { building: 'CMH73', item: 'Isopropyl Alcohol',   min: 25, max: 75  },
+      { building: 'CMH73', item: 'Thermal Paste',        min: 5,  max: 30  },
+      { building: 'CMH73', item: 'Electrical Tape',      min: 5,  max: 20  },
+      { building: 'CMH73', item: 'Dual-LC Cleaner',      min: 5,  max: 20  },
+      { building: 'CMH73', item: 'MPO Cleaner',          min: 5,  max: 20  },
+      { building: 'CMH73', item: 'Single-LC Cleaner',    min: 10, max: 20  },
+      { building: 'CMH73', item: 'MTP to LC 2.3m',       min: 10, max: 20  },
+      { building: 'CMH73', item: 'MTP to LC 25m',        min: 2,  max: 10  },
+      { building: 'CMH73', item: 'MTP to LC 30m',        min: 2,  max: 5   },
+      { building: 'CMH73', item: 'MTP to LC 55m',        min: 2,  max: 5   },
+      { building: 'CMH73', item: 'LC to LC 2m',          min: 10, max: 30  },
+      { building: 'CMH73', item: 'LC to LC 3m',          min: 10, max: 30  },
+      { building: 'CMH73', item: 'LC to LC 6m',          min: 5,  max: 20  },
+      { building: 'CMH73', item: 'LC to LC 15m',         min: 2,  max: 8   },
+      { building: 'CMH73', item: 'LC to LC 20m',         min: 2,  max: 10  },
+      { building: 'CMH73', item: 'LC to LC 30m',         min: 2,  max: 8   },
+      { building: 'CMH73', item: 'MTP to LC 75m',        min: 2,  max: 6   },
+      { building: 'CMH73', item: 'MTP to LC 85m',        min: 2,  max: 6   },
+      { building: 'CMH73', item: 'MTP to LC 100m',       min: 1,  max: 4   },
+      { building: 'CMH73', item: 'Green CAT6 (10m)',     min: 5,  max: 15  },
+      { building: 'CMH73', item: 'Green CAT6 (50m)',     min: 2,  max: 6   },
+      { building: 'CMH73', item: 'Orange CAT6 (5m)',     min: 5,  max: 20  },
+      { building: 'CMH73', item: 'Orange CAT6 (35m)',    min: 2,  max: 6   },
+      { building: 'CMH73', item: 'Orange CAT6 (50m)',    min: 2,  max: 6   },
+      { building: 'CMH73', item: 'LC to LC 40m',         min: 2,  max: 6   },
+      { building: 'CMH73', item: 'LC to LC 50m',         min: 2,  max: 10  },
+      { building: 'CMH73', item: 'SFP-H10GB-CU.5M-C',   min: 2,  max: 10  },
+      { building: 'CMH73', item: 'SFP-H10GB-CU3M-C',    min: 2,  max: 10  },
+    ];
+
+    // ── Generate a stable unique ID per item ──────────────────────────────
+    function makeID(building, item) {
+      // Simple slug: building + sanitized item name
+      return (building + '_' + item)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '');
+    }
+
+    // ── Build QR URL payload ───────────────────────────────────────────────
+    // Option A format: script reads these params silently on page load
+    // Base URL should match the page where Boost/the script runs.
+    // Update BASE_URL to your Boost page URL before printing.
+    const BASE_URL = 'https://myday-website.cmh.aws-border.com';
+
+    const grid = document.getElementById('label-grid');
+
+    ITEMS.forEach(({ building, item, min, max }) => {
+      const id      = makeID(building, item);
+      const params  = new URLSearchParams({
+        inv_action: 'deduct',
+        building,
+        item,
+        id,
+      });
+      const qrData  = `${BASE_URL}?${params.toString()}`;
+      const qrUrl   = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}`;
+
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.innerHTML = `
+        <div class="label-building">${building}</div>
+        <div class="label-item">${item}</div>
+        <img src="${qrUrl}" alt="QR: ${item}" />
+        <div class="label-meta">
+          <span>Min: <strong>${min}</strong></span>
+          <span>Max: <strong>${max}</strong></span>
+        </div>
+        <div class="label-id">ID: ${id}</div>
+      `;
+      grid.appendChild(label);
+    });
+  </script>
+
+</body>
+</html>

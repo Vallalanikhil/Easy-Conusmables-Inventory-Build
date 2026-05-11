@@ -235,19 +235,59 @@
     <h1>⚙ EZ Logi Con Count</h1>
     <div class="subtitle">Consumable Inventory Manager — DCO | CMH73 Pilot</div>
     <div class="subtitle" style="margin-top:6px;">Development Log &amp; Patch Notes</div>
-    <span class="current-tag">Current Release: v1.4.0</span>
+    <span class="current-tag">Current Release: v1.4.1</span>
   </div>
 
   <div class="container">
 
     <!-- ══════════════════════════════════════ -->
-    <!-- VERSION 1.4.0                          -->
+    <!-- VERSION 1.5.0                          -->
     <!-- ══════════════════════════════════════ -->
     <div class="version-block current">
       <div class="version-header">
+        <span class="version-number">v1.4.1</span>
+        <span class="version-name">"Sheet Happens"</span>
+        <span class="version-status status-current">Current Release</span>
+      </div>
+      <div class="version-body">
+
+        <div>
+          <div class="section-title new">✦ New Features</div>
+          <ul class="change-list">
+            <li><strong>Google Sheets Backend</strong> — All inventory data now reads from and writes to Google Sheets via a Google Apps Script web app endpoint — no Microsoft tokens, no IT dependency</li>
+            <li><strong>Live Item Push</strong> — Every quantity change immediately POSTs only the changed item to Google Sheets, lightweight with no full rewrite needed</li>
+            <li><strong>Hourly Re-fetch</strong> — Sync timer now pulls a fresh full read from Google Sheets every hour, picking up any direct edits logistics makes to the spreadsheet</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title changed">✦ Changes</div>
+          <ul class="change-list">
+            <li>Removed all SharePoint / Microsoft Graph API code entirely</li>
+            <li>Removed MSAL token auth logic — no longer needed</li>
+            <li>Sync button 🔄 now triggers a full re-fetch from Google Sheets and refreshes the panel table</li>
+            <li>Status indicator now reflects Google Sheets connection instead of SharePoint</li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="section-title fixed">✦ Fixes</div>
+          <ul class="change-list">
+            <li>Eliminated all remaining Microsoft auth dependencies that caused offline fallback on every load</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- VERSION 1.4.0                          -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="version-block">
+      <div class="version-header">
         <span class="version-number">v1.4.0</span>
         <span class="version-name">"On Target"</span>
-        <span class="version-status status-current">Current Release</span>
+        <span class="version-status status-superseded">Superseded</span>
       </div>
       <div class="version-body">
 

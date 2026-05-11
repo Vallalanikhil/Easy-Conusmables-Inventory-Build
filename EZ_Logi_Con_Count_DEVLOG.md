@@ -9,9 +9,32 @@
 ---
 
 ## ═══════════════════════════════════════
+## 📦 VERSION 1.4.1
+### *"Sheet Happens"*
+#### Status: CURRENT RELEASE
+## ═══════════════════════════════════════
+
+### ✅ NEW FEATURES
+- **Google Sheets Backend** — All inventory data now reads from and writes to Google Sheets via a Google Apps Script web app endpoint — no Microsoft tokens, no IT dependency
+- **Live Item Push** — Every quantity change immediately POSTs only the changed item to Google Sheets (lightweight, no full rewrite)
+- **Hourly Re-fetch** — Sync timer now pulls a fresh full read from Google Sheets every hour, picking up any direct edits logistics makes to the spreadsheet
+
+### 🔧 CHANGES
+- Removed all SharePoint / Microsoft Graph API code entirely
+- Removed MSAL token auth logic — no longer needed
+- Sync button (🔄) now triggers a full re-fetch from Google Sheets and refreshes the panel table
+- SP status indicator now reflects Google Sheets connection status
+- Header tooltip updated to reference Google Sheets instead of SharePoint
+
+### 🐛 FIXES
+- Eliminated all remaining Microsoft auth dependencies that caused offline fallback on every load
+
+---
+
+## ═══════════════════════════════════════
 ## 📦 VERSION 1.4.0
 ### *"On Target"*
-#### Status: CURRENT RELEASE
+#### Status: SUPERSEDED
 ## ═══════════════════════════════════════
 
 ### ✅ NEW FEATURES

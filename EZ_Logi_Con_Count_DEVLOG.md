@@ -9,9 +9,51 @@
 ---
 
 ## ═══════════════════════════════════════
+## 📦 VERSION 1.4.5
+### *"Quiet Hours"*
+#### Status: CURRENT RELEASE
+## ═══════════════════════════════════════
+
+### ✅ NEW FEATURES
+- **Published CSV as primary read source** — Inventory loads from Google Sheets published CSV URL, no auth required, works from any browser instantly
+- **Per-building CSV URL map** — `CSV_URLS` config object maps each building to its own published CSV tab, making multi-building expansion as simple as adding one line per building
+- **GET-based sheet writes** — Quantity updates sent to Apps Script via GET URL parameters instead of POST, bypassing Google's auth redirect wall that blocked all POST requests from Tampermonkey
+- **Scheduled Digest Windows** — Slack digest only fires at 6:00 AM and 12:00 PM within a 5-minute window — no more alerts on every script load
+- **Shared Digest State via Apps Script Properties** — Digest sent status stored server-side so all users share the same sent state — only one script fires per window
+- **Full read/write sync confirmed working end to end**
+
+### 🔧 CHANGES
+- Removed `anonymous: true` from all GM_xmlhttpRequest calls — was stripping request context needed by Google
+- Added `@connect *` wildcard to cover all Google redirect domains
+- Apps Script rewritten to handle all actions (read, update, getDigestKey, setDigestKey) through `doGet` with URL parameters
+- All POST requests replaced with GET requests to avoid Google's login redirect interception
+- Debug toasts removed after successful end-to-end verification
+- Apps Script URL updated to latest deployment
+
+### 🐛 FIXES
+- Resolved HTML login page being returned instead of JSON on all requests
+- Resolved quantity changes not updating Google Sheet in real time
+- Resolved Slack channel being flooded on every script load
+
+---
+
+## ═══════════════════════════════════════
+## 📦 VERSION 1.4.4
+### *"Two Lines"*
+#### Status: SUPERSEDED
+## ═══════════════════════════════════════
+
+### 🔧 CHANGES
+- Daily digest split to its own dedicated Slack webhook (`SLACK_DIGEST_WEBHOOK`) — separate from the instant per-item alert webhook
+- Digest payload simplified to just `building` and `summary` to match the new workflow's two-variable setup
+- Instant alert payload unchanged — still sends `building`, `item_needed`, `current_qty`, `reorder_qty`, `max_qty`
+
+---
+
+## ═══════════════════════════════════════
 ## 📦 VERSION 1.4.3
 ### *"Loud and Clear"*
-#### Status: CURRENT RELEASE
+#### Status: SUPERSEDED
 ## ═══════════════════════════════════════
 
 ### 🐛 FIXES

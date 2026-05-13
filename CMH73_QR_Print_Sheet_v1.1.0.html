@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CMH73 — QR Label Print Sheet v1.1.0</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #fff;
+      font-family: 'Cinzel', 'Georgia', serif;
+      padding: 20px;
+      color: #111;
+    }
+
+    .page-title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      color: #111;
+    }
+    .page-sub {
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    .page-status {
+      text-align: center;
+      font-size: 9px;
+      color: #999;
+      margin-bottom: 20px;
+      letter-spacing: 0.05em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .label {
+      border: 1.5px solid #333;
+      border-radius: 6px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .label-building {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #888;
+    }
+
+    .label-item {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      text-align: center;
+      color: #111;
+      line-height: 1.3;
+    }
+
+    .label img {
+      width: 120px;
+      height: 120px;
+      display: block;
+    }
+
+    .label-meta {
+      display: flex;
+      gap: 10px;
+      font-size: 8px;
+      color: #555;
+      letter-spacing: 0.05em;
+    }
+    .label-meta span strong {
+      color: #111;
+      font-weight: 700;
+    }
+
+    .label-id {
+      font-size: 7px;
+      color: #aaa;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    @media print {
+      body { padding: 10px; }
+      .no-print { display: none; }
+      .grid { gap: 8px; }
+    }
+
+    .print-bar {
+      text-align: center;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .print-btn {
+      padding: 10px 28px;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Cinzel', serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .print-btn:hover { background: #333; }
+    .refresh-btn {
+      padding: 10px 20px;
+      background: #1a4a1a;
+      color: #90d090;
+      border: 1px solid #4caf5044;
+      border-radius: 6px;
+      font-family: 'Cinzel', serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .refresh-btn:hover { background: #1e5a1e; }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      font-size: 12px;
+      color: #999;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-title">CMH73 — Consumable QR Labels</div>
+  <div class="page-sub">EZ Logi Con Count v1.1.0 | Scan to deduct inventory</div>
+  <div class="page-status" id="status">Loading live data from Google Sheets...</div>
+
+  <div class="print-bar no-print">
+    <button class="refresh-btn" onclick="loadItems()">🔄 Refresh from Sheets</button>
+    <button class="print-btn" onclick="window.print()">🖨 Print All Labels</button>
+  </div>
+
+  <div class="grid" id="label-grid">
+    <div class="loading">Loading inventory...</div>
+  </div>
+
+  <script>
+    // ── Config — must match EZ_Logi_Con_Count_v1.4.5.js ──────────────────
+    const BASE_URL = 'https://myday-website.cmh.aws-border.com';
+
+    // Published CSV URL — same as CONFIG.CSV_URLS['CMH73'] in the script
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSf17egxibNMiZ_9Tr1vQIbC_NGL03V_N3fqg8ukHB3b5XRpgkhE7kCMVWje1OF4B3jt8HgeAhJIS0Q/pub?gid=446507335&single=true&output=csv';
+
+    const BUILDING = 'CMH73';
+
+    // ── Parse CSV ─────────────────────────────────────────────────────────
+    function parseCSV(text) {
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) return [];
+      const parse = line => {
+        const result = [];
+        let cur = '', inQuote = false;
+        for (const ch of line) {
+          if (ch === '"') { inQuote = !inQuote; }
+          else if (ch === ',' && !inQuote) { result.push(cur.trim()); cur = ''; }
+          else { cur += ch; }
+        }
+        result.push(cur.trim());
+        return result;
+      };
+      return lines.slice(1)
+        .map(line => parse(line))
+        .filter(cols => cols[0] === BUILDING)
+        .map(cols => ({
+          building: cols[0],
+          item:     cols[1],
+          current:  Number(cols[2]),
+          max:      Number(cols[3]),
+          min:      Number(cols[4]),
+        }));
+    }
+
+    // ── Generate stable unique ID per item ────────────────────────────────
+    function makeID(building, item) {
+      return (building + '_' + item)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '');
+    }
+
+    // ── Render labels ─────────────────────────────────────────────────────
+    function renderLabels(items) {
+      const grid = document.getElementById('label-grid');
+      grid.innerHTML = '';
+
+      items.forEach(({ building, item, current, min, max }) => {
+        const id     = makeID(building, item);
+        // QR URL matches exactly what checkScanDeduction() reads in the script
+        const params = new URLSearchParams({
+          inv_action: 'deduct',
+          building,
+          item,
+        });
+        const qrData = `${BASE_URL}?${params.toString()}`;
+        const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
+
+        const label = document.createElement('div');
+        label.className = 'label';
+        label.innerHTML = `
+          <div class="label-building">${building}</div>
+          <div class="label-item">${item}</div>
+          <img src="${qrUrl}" alt="QR: ${item}" />
+          <div class="label-meta">
+            <span>Min: <strong>${min}</strong></span>
+            <span>Max: <strong>${max}</strong></span>
+          </div>
+          <div class="label-id">ID: ${id}</div>
+        `;
+        grid.appendChild(label);
+      });
+    }
+
+    // ── Load from Google Sheets CSV ───────────────────────────────────────
+    function loadItems() {
+      const status = document.getElementById('status');
+      const grid   = document.getElementById('label-grid');
+      status.textContent = 'Fetching live data from Google Sheets...';
+      grid.innerHTML = '<div class="loading">Loading inventory...</div>';
+
+      fetch(CSV_URL)
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.text();
+        })
+        .then(text => {
+          const items = parseCSV(text);
+          if (items.length === 0) throw new Error('No CMH73 items found in sheet');
+          renderLabels(items);
+          const now = new Date().toLocaleTimeString();
+          status.textContent = `Live data loaded — ${items.length} items — last refreshed ${now}`;
+        })
+        .catch(err => {
+          status.textContent = 'Could not load from Sheets — using fallback data. (' + err.message + ')';
+          renderLabels(FALLBACK_ITEMS);
+        });
+    }
+
+    // ── Fallback data — matches SEED_DATA in script ───────────────────────
+    // Used only if Google Sheets CSV is unreachable
+    const FALLBACK_ITEMS = [
+      { building: 'CMH73', item: 'Isopropyl Alcohol',  current: 46, min: 25, max: 75  },
+      { building: 'CMH73', item: 'Thermal Paste',       current: 7,  min: 5,  max: 30  },
+      { building: 'CMH73', item: 'Electrical Tape',     current: 22, min: 5,  max: 20  },
+      { building: 'CMH73', item: 'Dual-LC Cleaner',     current: 6,  min: 5,  max: 20  },
+      { building: 'CMH73', item: 'MPO Cleaner',         current: 1,  min: 5,  max: 20  },
+      { building: 'CMH73', item: 'Single-LC Cleaner',   current: 66, min: 10, max: 20  },
+      { building: 'CMH73', item: 'MTP to LC 2.3m',      current: 16, min: 10, max: 20  },
+      { building: 'CMH73', item: 'MTP to LC 25m',       current: 2,  min: 2,  max: 10  },
+      { building: 'CMH73', item: 'MTP to LC 30m',       current: 0,  min: 2,  max: 5   },
+      { building: 'CMH73', item: 'MTP to LC 55m',       current: 2,  min: 2,  max: 5   },
+      { building: 'CMH73', item: 'LC to LC 2m',         current: 46, min: 10, max: 30  },
+      { building: 'CMH73', item: 'LC to LC 3m',         current: 0,  min: 10, max: 30  },
+      { building: 'CMH73', item: 'LC to LC 6m',         current: 0,  min: 5,  max: 20  },
+      { building: 'CMH73', item: 'LC to LC 15m',        current: 4,  min: 2,  max: 8   },
+      { building: 'CMH73', item: 'LC to LC 20m',        current: 14, min: 2,  max: 10  },
+      { building: 'CMH73', item: 'LC to LC 30m',        current: 8,  min: 2,  max: 8   },
+      { building: 'CMH73', item: 'MTP to LC 75m',       current: 3,  min: 2,  max: 6   },
+      { building: 'CMH73', item: 'MTP to LC 85m',       current: 3,  min: 2,  max: 6   },
+      { building: 'CMH73', item: 'MTP to LC 100m',      current: 0,  min: 1,  max: 4   },
+      { building: 'CMH73', item: 'Green CAT6 (10m)',    current: 15, min: 5,  max: 15  },
+      { building: 'CMH73', item: 'Green CAT6 (50m)',    current: 4,  min: 2,  max: 6   },
+      { building: 'CMH73', item: 'Orange CAT6 (5m)',    current: 17, min: 5,  max: 20  },
+      { building: 'CMH73', item: 'Orange CAT6 (35m)',   current: 4,  min: 2,  max: 6   },
+      { building: 'CMH73', item: 'Orange CAT6 (50m)',   current: 4,  min: 2,  max: 6   },
+      { building: 'CMH73', item: 'LC to LC 40m',        current: 2,  min: 2,  max: 6   },
+      { building: 'CMH73', item: 'LC to LC 50m',        current: 7,  min: 2,  max: 10  },
+      { building: 'CMH73', item: 'SFP-H10GB-CU.5M-C',  current: 13, min: 2,  max: 10  },
+      { building: 'CMH73', item: 'SFP-H10GB-CU3M-C',   current: 7,  min: 2,  max: 10  },
+    ];
+
+    // ── Auto-load on page open ────────────────────────────────────────────
+    loadItems();
+  </script>
+
+</body>
+</html>

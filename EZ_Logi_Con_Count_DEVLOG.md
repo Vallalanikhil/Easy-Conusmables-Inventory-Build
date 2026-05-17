@@ -9,9 +9,31 @@
 ---
 
 ## ═══════════════════════════════════════
+## 📦 VERSION 1.4.6
+### *"No Funny Business"*
+#### Status: CURRENT RELEASE
+## ═══════════════════════════════════════
+
+### ✅ NEW FEATURES
+- **Scan Confirmation Dialog** — After scanning the same item more than 2 times, a yes/no dialog appears asking "Looks like you are about to take more than two cables, are you sure you meant to do that?" before deducting
+- **Spam Lock** — If the same QR code is scanned 5+ times within 60 seconds, the script locks for 5 minutes with a visible countdown overlay
+- **Sweep Detection & Revert** — If 5+ different items are scanned within 2 minutes (bulk sweep pattern), all those quantity changes are automatically reverted and the script locks for 5 minutes
+- **Lock Persistence** — Lock state saved to localStorage so it survives page refreshes — scanner stays locked for the full 5 minutes even if the page reloads
+- **QR Render Fix** — QR codes now fetched via GM_xmlhttpRequest as blob and drawn onto canvas, bypassing Boost page Content Security Policy that blocked external image URLs
+- **Print Fix** — Print label now uses canvas data URL embedded directly in the print window — no external image dependency
+
+### 🔧 CHANGES
+- `checkScanDeduction` fully rewritten with three-layer abuse protection
+- `performDeduction` extracted as separate function for clean reuse
+- Panel quantity display now updates in real time after a QR scan deduction
+- Scan also pushes updated quantity to Google Sheets immediately on deduction
+
+---
+
+## ═══════════════════════════════════════
 ## 📦 VERSION 1.4.5
 ### *"Quiet Hours"*
-#### Status: CURRENT RELEASE
+#### Status: SUPERSEDED
 ## ═══════════════════════════════════════
 
 ### ✅ NEW FEATURES

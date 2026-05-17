@@ -96,10 +96,26 @@
   let syncTimer    = null;
   let sheetsAvailable = false;
 
+  // ─── ANTI-ABUSE STATE ─────────────────────────────────────────────────────
+  // scanCounts:    { itemKey: { count, firstScanTime } } — per-item scan tracking
+  // sweepLog:      [ { itemKey, qty, timestamp } ] — recent scans across all items
+  // lockUntil:     timestamp when script lock expires (0 = not locked)
+  const SCAN_CONFIRM_THRESHOLD = 2;    // ask after this many scans of same item
+  const SPAM_LOCK_THRESHOLD    = 5;    // lock after this many scans of same item
+  const SPAM_WINDOW_MS         = 60 * 1000;       // within 60 seconds
+  const SWEEP_ITEM_THRESHOLD   = 5;    // lock if this many different items scanned
+  const SWEEP_WINDOW_MS        = 2 * 60 * 1000;   // within 2 minutes
+  const LOCK_DURATION_MS       = 5 * 60 * 1000;   // lock for 5 minutes
+  let scanCounts  = {};
+  let sweepLog    = [];
+  let lockUntil   = 0;
+
   // ─── INIT ─────────────────────────────────────────────────────────────────
   function init() {
     injectStyles();
-    checkScanDeduction(); // handle QR scan silently before rendering
+    // Restore lock state across page loads
+    lockUntil = Number(GM_getValue('lock_until', 0));
+    checkScanDeduction();
     if (!userBuilding || !userRole) {
       showSetupWizard();
     } else {
@@ -108,16 +124,26 @@
   }
 
   // ─── QR SCAN DEDUCTION LISTENER ───────────────────────────────────────────
-  // When a hand scanner fires a QR URL, this catches the params silently,
-  // deducts 1 from the matching item, saves, and cleans the URL — no page reload.
   function checkScanDeduction() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('inv_action') !== 'deduct') return;
 
     const scannedBuilding = params.get('building');
     const scannedItem     = params.get('item');
-
     if (!scannedBuilding || !scannedItem) return;
+
+    // Clean URL immediately regardless of outcome
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    // ── Check if script is locked ──────────────────────────────────────────
+    const now = Date.now();
+    if (lockUntil > now) {
+      const remaining = Math.ceil((lockUntil - now) / 1000);
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      showLockOverlay(`🔒 Scanner locked — ${mins}m ${secs}s remaining\nToo many scans detected.`);
+      return;
+    }
 
     // Load inventory if not already loaded
     if (allRows.length === 0) {
@@ -129,26 +155,142 @@
     const globalIdx = allRows.findIndex(
       r => r[COL.BUILDING] === scannedBuilding && r[COL.ITEM] === scannedItem
     );
-
     if (globalIdx === -1) {
       console.warn('[EZ Logi] Scanned item not found:', scannedItem);
-    } else {
-      const current = Number(allRows[globalIdx][COL.CURRENT]);
-      const min     = Number(allRows[globalIdx][COL.MIN]);
-      const newQty  = Math.max(0, current - 1);
-      allRows[globalIdx][COL.CURRENT] = newQty;
-      GM_setValue('inventory_' + scannedBuilding, JSON.stringify(allRows));
-      showToast(`📦 Scanned: ${scannedItem} → ${newQty} remaining`, newQty <= min ? 'error' : 'success');
-      if (newQty <= min) {
-        // Re-filter inventory for alert
-        inventory = allRows.filter(r => r[COL.BUILDING] === scannedBuilding);
-        triggerSlackAlert(allRows[globalIdx]);
-      }
+      return;
     }
 
-    // Clean the URL params without reloading the page
-    const cleanUrl = window.location.pathname;
-    window.history.replaceState({}, document.title, cleanUrl);
+    const itemKey = `${scannedBuilding}::${scannedItem}`;
+
+    // ── Spam detection — same item scanned too many times too fast ─────────
+    if (!scanCounts[itemKey]) scanCounts[itemKey] = { count: 0, firstScanTime: now };
+    const entry = scanCounts[itemKey];
+    if (now - entry.firstScanTime > SPAM_WINDOW_MS) {
+      // Reset window
+      entry.count = 0;
+      entry.firstScanTime = now;
+    }
+    entry.count++;
+
+    if (entry.count > SPAM_LOCK_THRESHOLD) {
+      lockUntil = now + LOCK_DURATION_MS;
+      GM_setValue('lock_until', lockUntil);
+      showLockOverlay(`🚨 Scanner locked for 5 minutes\nSpam scanning detected on: ${scannedItem}`);
+      return;
+    }
+
+    // ── Sweep detection — many different items scanned in quick succession ──
+    sweepLog = sweepLog.filter(e => now - e.timestamp < SWEEP_WINDOW_MS);
+    sweepLog.push({ itemKey, qty: Number(allRows[globalIdx][COL.CURRENT]), globalIdx, timestamp: now });
+    const uniqueItems = new Set(sweepLog.map(e => e.itemKey));
+    if (uniqueItems.size >= SWEEP_ITEM_THRESHOLD) {
+      // Revert all swept items
+      sweepLog.forEach(e => {
+        allRows[e.globalIdx][COL.CURRENT] = e.qty;
+      });
+      GM_setValue('inventory_' + scannedBuilding, JSON.stringify(allRows));
+      sweepLog = [];
+      lockUntil = now + LOCK_DURATION_MS;
+      GM_setValue('lock_until', lockUntil);
+      showLockOverlay(`🚨 Scanner locked for 5 minutes\nBulk sweep detected — inventory reverted.`);
+      return;
+    }
+
+    // ── Confirmation dialog — more than 2 scans of same item ───────────────
+    if (entry.count > SCAN_CONFIRM_THRESHOLD) {
+      showScanConfirm(scannedItem, () => {
+        performDeduction(globalIdx, scannedBuilding, scannedItem, itemKey);
+      });
+      return;
+    }
+
+    // ── Normal deduction ───────────────────────────────────────────────────
+    performDeduction(globalIdx, scannedBuilding, scannedItem, itemKey);
+  }
+
+  // ─── PERFORM DEDUCTION ────────────────────────────────────────────────────
+  function performDeduction(globalIdx, building, item, itemKey) {
+    const current = Number(allRows[globalIdx][COL.CURRENT]);
+    const min     = Number(allRows[globalIdx][COL.MIN]);
+    const newQty  = Math.max(0, current - 1);
+    allRows[globalIdx][COL.CURRENT] = newQty;
+    GM_setValue('inventory_' + building, JSON.stringify(allRows));
+    pushItemToSheets(building, item, newQty);
+    showToast(`📦 Scanned: ${item} → ${newQty} remaining`, newQty <= min ? 'error' : 'success');
+    if (newQty <= min) {
+      inventory = allRows.filter(r => r[COL.BUILDING] === building);
+    }
+    // Refresh panel qty if visible
+    const invIdx = inventory.findIndex(r => r[COL.BUILDING] === building && r[COL.ITEM] === item);
+    if (invIdx !== -1) {
+      const qtyCell = document.getElementById(`qty-${invIdx}`);
+      if (qtyCell) {
+        qtyCell.textContent = newQty;
+        qtyCell.closest('tr').classList.toggle('inv-low', newQty <= min);
+      }
+    }
+  }
+
+  // ─── SCAN CONFIRMATION DIALOG ─────────────────────────────────────────────
+  function showScanConfirm(item, onConfirm) {
+    const existing = document.getElementById('inv-confirm-overlay');
+    if (existing) existing.remove();
+
+    const overlay = createElement('div', 'inv-overlay');
+    overlay.id = 'inv-confirm-overlay';
+    overlay.style.zIndex = '1000003';
+
+    const box = createElement('div', 'inv-wizard');
+    box.style.gap = '16px';
+    box.innerHTML = `
+      <div class="inv-wizard-topbar">
+        <h2>⚠ Hold On</h2>
+      </div>
+      <p style="font-size:12px;color:#e8d9b0;text-align:center;line-height:1.6;">
+        Looks like you are about to take more than two cables,<br>are you sure you meant to do that?
+      </p>
+      <p style="font-size:10px;color:#c9a84c;text-align:center;">Item: <strong>${item}</strong></p>
+      <div class="inv-confirm-row">
+        <button id="inv-confirm-yes" class="inv-confirm-yes">Yes, take it</button>
+        <button id="inv-confirm-no"  class="inv-confirm-no">No, cancel</button>
+      </div>
+    `;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    document.getElementById('inv-confirm-yes').addEventListener('click', () => {
+      overlay.remove();
+      onConfirm();
+    });
+    document.getElementById('inv-confirm-no').addEventListener('click', () => {
+      overlay.remove();
+      showToast('Scan cancelled', 'info');
+    });
+  }
+
+  // ─── LOCK OVERLAY ─────────────────────────────────────────────────────────
+  function showLockOverlay(message) {
+    const existing = document.getElementById('inv-lock-overlay');
+    if (existing) existing.remove();
+
+    const overlay = createElement('div', 'inv-overlay');
+    overlay.id = 'inv-lock-overlay';
+    overlay.style.zIndex = '1000004';
+
+    const box = createElement('div', 'inv-wizard');
+    box.style.gap = '16px';
+    box.innerHTML = `
+      <div class="inv-wizard-topbar">
+        <h2>🔒 Scanner Locked</h2>
+      </div>
+      <p style="font-size:12px;color:#f0a0a0;text-align:center;line-height:1.8;white-space:pre-line;">${message}</p>
+      <p style="font-size:10px;color:#a89060;text-align:center;">Contact your Logistics team if this was a mistake.</p>
+      <button id="inv-lock-dismiss" style="padding:10px;border-radius:7px;background:#1c1c1c;color:#c9a84c;border:1px solid #c9a84c44;font-family:'Cinzel',serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0.08em;text-transform:uppercase;">Dismiss</button>
+    `;
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    document.getElementById('inv-lock-dismiss').addEventListener('click', () => overlay.remove());
   }
 
   // ─── SETUP WIZARD ─────────────────────────────────────────────────────────
@@ -378,7 +520,7 @@
     panel.id = 'inv-panel';
     panel.innerHTML = `
       <div class="inv-header">
-        <span class="inv-title">📦 Inventory — ${userBuilding}</span>
+        <span class="inv-title">📦 Inventory Management — ${userBuilding}</span>
         <span class="inv-role-badge ${userRole}">${userRole.toUpperCase()}</span>
         <span class="inv-sp-badge" id="inv-sp-badge" title="${sheetsAvailable ? 'Google Sheets connected' : 'Offline — local cache'}">${sheetsAvailable ? '🟢' : '🟡'}</span>
         <button class="inv-btn-icon" id="inv-sync-now" title="Sync to Google Sheets now">🔄</button>
@@ -387,6 +529,13 @@
       </div>
       <div class="inv-body" id="inv-body">
         <table class="inv-table">
+          <colgroup>
+            <col class="col-item" />
+            <col class="col-qty" />
+            <col class="col-min" />
+            <col class="col-max" />
+            <col class="col-actions" />
+          </colgroup>
           <thead>
             <tr>
               <th>Item</th>
@@ -575,8 +724,57 @@
     const current   = Number(allRows[globalIdx][COL.CURRENT]);
     const min       = Number(allRows[globalIdx][COL.MIN]);
     const max       = Number(allRows[globalIdx][COL.MAX]);
-    const newQty    = Math.max(0, Math.min(max, current + delta));
     const item      = allRows[globalIdx][COL.ITEM];
+    const building  = allRows[globalIdx][COL.BUILDING];
+    const itemKey   = `btn::${building}::${item}`;
+    const now       = Date.now();
+
+    // ── Check lock ────────────────────────────────────────────────────────
+    if (lockUntil > now) {
+      const remaining = Math.ceil((lockUntil - now) / 1000);
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      showLockOverlay(`🔒 Scanner locked — ${mins}m ${secs}s remaining\nToo many adjustments detected.`);
+      return;
+    }
+
+    // ── Max cap on plus button ────────────────────────────────────────────
+    if (delta > 0 && current >= max) {
+      showToast(`${item} is already at max (${max})`, 'info');
+      return;
+    }
+
+    // ── Minus button abuse protection ─────────────────────────────────────
+    if (delta < 0) {
+      if (!scanCounts[itemKey]) scanCounts[itemKey] = { count: 0, firstScanTime: now };
+      const entry = scanCounts[itemKey];
+      if (now - entry.firstScanTime > SPAM_WINDOW_MS) {
+        entry.count = 0;
+        entry.firstScanTime = now;
+      }
+      entry.count++;
+
+      // Spam lock — too many minus clicks on same item
+      if (entry.count > SPAM_LOCK_THRESHOLD) {
+        lockUntil = now + LOCK_DURATION_MS;
+        GM_setValue('lock_until', lockUntil);
+        showLockOverlay(`🚨 Locked for 5 minutes\nToo many deductions on: ${item}`);
+        return;
+      }
+
+      // Confirmation after 2 minus clicks on same item
+      if (entry.count > SCAN_CONFIRM_THRESHOLD) {
+        showScanConfirm(item, () => applyQtyChange(localIdx, globalIdx, current, min, max, item, building, delta));
+        return;
+      }
+    }
+
+    applyQtyChange(localIdx, globalIdx, current, min, max, item, building, delta);
+  }
+
+  // ─── APPLY QUANTITY CHANGE ────────────────────────────────────────────────
+  function applyQtyChange(localIdx, globalIdx, current, min, max, item, building, delta) {
+    const newQty = Math.max(0, Math.min(max, current + delta));
 
     allRows[globalIdx][COL.CURRENT]  = newQty;
     inventory[localIdx][COL.CURRENT] = newQty;
@@ -587,8 +785,13 @@
       qtyCell.closest('tr').classList.toggle('inv-low', newQty <= min);
     }
 
+    // Disable plus button if at max
+    const row     = qtyCell ? qtyCell.closest('tr') : null;
+    const plusBtn = row ? row.querySelector('.inv-plus') : null;
+    if (plusBtn) plusBtn.disabled = newQty >= max;
+
     saveLocalCache();
-    pushItemToSheets(inventory[localIdx][COL.BUILDING], item, newQty);
+    pushItemToSheets(building, item, newQty);
   }
 
   // ─── SCHEDULED DIGEST CHECK ───────────────────────────────────────────────
@@ -695,7 +898,7 @@
       body.style.display = '';
       btn.title = 'Minimize';
       btn.textContent = '—';
-      panel.style.width = '420px';
+      panel.style.width = '';
     } else {
       panel.style.width = panel.offsetWidth + 'px';
       body.style.display = 'none';
@@ -754,7 +957,8 @@
     const style = document.createElement('style');
     style.textContent = `
       #inv-panel {
-        position: fixed; bottom: 24px; right: 24px; width: 420px;
+        position: fixed; bottom: 24px; right: 24px;
+        width: clamp(480px, 36vw, 620px);
         background: #0d1f0f; color: #e8d9b0;
         border-radius: 10px; border: 1px solid #c9a84c;
         box-shadow: 0 8px 36px rgba(0,0,0,0.7), 0 0 0 1px #c9a84c33;
@@ -762,51 +966,77 @@
         z-index: 999999; overflow: hidden; box-sizing: border-box;
       }
       .inv-header {
-        display: flex; align-items: center; gap: 8px;
-        padding: 11px 14px; background: #0a1a0c;
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 14px; background: #0a1a0c;
         border-bottom: 1px solid #c9a84c55;
         user-select: none; -webkit-user-select: none;
       }
       .inv-title {
-        font-weight: 700; font-size: 13px; letter-spacing: 0.08em;
+        font-weight: 700; font-size: 13px; letter-spacing: 0.07em;
         color: #f0d080; flex: 1; text-transform: uppercase;
+        white-space: nowrap;
       }
       .inv-role-badge {
         font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
-        padding: 3px 9px; border-radius: 20px;
+        padding: 3px 10px; border-radius: 20px;
         text-transform: uppercase; font-family: 'Cinzel', serif;
+        white-space: nowrap; flex-shrink: 0;
       }
       .inv-role-badge.logistics { background: #c9a84c; color: #0d1f0f; }
       .inv-role-badge.dco       { background: #8b6914; color: #f0d080; }
-      .inv-sp-badge { font-size: 12px; cursor: default; }
+      .inv-sp-badge { font-size: 12px; cursor: default; flex-shrink: 0; }
       .inv-body {
-        padding: 12px; max-height: 320px; overflow-y: auto;
+        padding: 10px 12px; max-height: 360px; overflow-y: auto;
         scrollbar-width: thin; scrollbar-color: #c9a84c44 transparent;
       }
-      .inv-table { width: 100%; border-collapse: collapse; }
+      .inv-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      .inv-table col.col-item    { width: 40%; }
+      .inv-table col.col-qty     { width: 10%; }
+      .inv-table col.col-min     { width: 10%; }
+      .inv-table col.col-max     { width: 10%; }
+      .inv-table col.col-actions { width: 30%; }
       .inv-table th {
-        text-align: left; padding: 7px 8px;
+        text-align: left; padding: 5px 8px;
         border-bottom: 1px solid #c9a84c44; color: #c9a84c;
         font-weight: 600; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+        white-space: nowrap;
       }
       .inv-table td {
-        padding: 7px 8px; border-bottom: 1px solid #0d1f0f;
+        padding: 5px 8px; border-bottom: 1px solid #0d1f0f;
         color: #e8d9b0; font-size: 12px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       .inv-table tr.inv-low td { color: #e05c5c; font-weight: 600; }
       .inv-table tr:hover td { background: #122614; }
-      .inv-actions { display: flex; gap: 6px; }
+      .inv-actions { display: flex; gap: 5px; align-items: center; }
       .inv-btn {
-        width: 28px; height: 28px; border: none; border-radius: 5px;
-        font-size: 16px; font-weight: 700; cursor: pointer; line-height: 1;
-        font-family: 'Cinzel', serif; transition: opacity 0.15s;
+        width: 26px; height: 26px; border: none; border-radius: 5px;
+        font-size: 15px; font-weight: 700; cursor: pointer; line-height: 1;
+        font-family: 'Cinzel', serif; transition: opacity 0.15s; flex-shrink: 0;
       }
       .inv-btn:hover { opacity: 0.8; }
+      .inv-btn:disabled { opacity: 0.35; cursor: not-allowed; }
       .inv-minus { background: #7a1f1f; color: #f0a0a0; border: 1px solid #e05c5c55; }
       .inv-plus  { background: #1a4a1a; color: #90d090; border: 1px solid #4caf5055; }
-      .inv-btn.inv-qr { background: #1a2a3a; color: #80b0d0; border: 1px solid #4080b044; font-size: 12px; }
-      .inv-btn-icon {
-        background: transparent; border: none; color: #c9a84c99;
+      .inv-btn.inv-qr { background: #1a2a3a; color: #80b0d0; border: 1px solid #4080b044; font-size: 11px; }
+      .inv-confirm-yes {
+        flex: 1; padding: 10px; border-radius: 7px;
+        background: #1a4a1a; color: #90d090; border: 1px solid #4caf5055;
+        font-family: 'Cinzel', serif; font-size: 12px; font-weight: 700;
+        cursor: pointer; letter-spacing: 0.08em; text-transform: uppercase;
+        transition: background 0.15s;
+      }
+      .inv-confirm-yes:hover { background: #1e5a1e; }
+      .inv-confirm-no {
+        flex: 1; padding: 10px; border-radius: 7px;
+        background: #7a1f1f; color: #f0a0a0; border: 1px solid #e05c5c55;
+        font-family: 'Cinzel', serif; font-size: 12px; font-weight: 700;
+        cursor: pointer; letter-spacing: 0.08em; text-transform: uppercase;
+        transition: background 0.15s;
+      }
+      .inv-confirm-no:hover { background: #8a2f2f; }
+      .inv-confirm-row { display: flex; gap: 10px; width: 100%; }
+      .inv-btn-icon {        background: transparent; border: none; color: #c9a84c99;
         cursor: pointer; font-size: 14px; padding: 2px 5px;
         border-radius: 4px; transition: color 0.15s, background 0.15s;
       }
